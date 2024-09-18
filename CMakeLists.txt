@@ -10,6 +10,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Add library target
 add_library(libfreedom SHARED src/libfreedom.c)
 
+target_include_directories(libfreedom PRIVATE /usr/include/libdrm)
+
 # Prevent it from being called liblibfreedom.so
 set_target_properties(libfreedom PROPERTIES
     OUTPUT_NAME "freedom"  # This will create libfreedom.so
