@@ -16,43 +16,41 @@ typedef struct {
     char os_name[128];         // Operating system name
     char architecture[32];     // CPU architecture
     char firmware_type[64];    // Type of firmware (e.g., BIOS, UEFI, Coreboot)
-    int proprietary_drivers;   // Number of proprietary drivers
     size_t connector_count;
     uint32_t *connector_types;
-} SystemFreedom;
+} SystemData;
 
 typedef struct {
     int status;
-    SystemFreedom system_freedom;
+    SystemData system_data;
     const char *error;
-} SystemFreedomResult;
+} SystemDataResult;
 
-// Create a successful result
-SystemFreedomResult create_success_result(SystemFreedom system_freedom) {
-    SystemFreedomResult result;
-    result.status = 0;  // Standard success code
-    result.system_freedom = system_freedom;
-    result.error = NULL;
-    return result;
-}
-
-// Create an empty SystemFreedom
-SystemFreedom create_empty_system_freedom() {
-    SystemFreedom empty;
+// Create an empty SystemData
+SystemData create_empty_system_data() {
+    SystemData empty;
     snprintf(empty.os_name, sizeof(empty.os_name), "%s", "");
     snprintf(empty.architecture, sizeof(empty.architecture), "%s", "");
     snprintf(empty.firmware_type, sizeof(empty.firmware_type), "%s", "");
-    empty.proprietary_drivers = 0;
     empty.connector_count = 0;
     empty.connector_types = NULL;
     return empty;
 }
 
+// Create a successful result
+SystemDataResult create_success_result(SystemData system_data) {
+    SystemDataResult result;
+    result.status = 0;  // Standard success code
+    result.system_data = system_data;
+    result.error = NULL;
+    return result;
+}
+
 // Create an error result
-SystemFreedomResult create_error_result(const char *error) {
-    SystemFreedomResult result;
+SystemDataResult create_error_result(const char *error) {
+    SystemDataResult result;
     result.status = 1;
-    result.system_freedom = create_empty_system_freedom();
+    result.system_data = create_empty_system_data();
     result.error = error;
     return result;
 }
@@ -61,25 +59,28 @@ SystemFreedomResult create_error_result(const char *error) {
 int is_drm_device(const char *path) {
     struct stat st;
     if (stat(path, &st) != 0) {
-        return 0;  // File does not exist or cannot be accessed
+        return 0; // File does not exist or cannot be accessed
     }
-    return S_ISCHR(st.st_mode);  // Return true if it's a character device
+    return S_ISCHR(st.st_mode); // Return true if it's a character device
 }
 
-void free_system_freedom(SystemFreedom *system_freedom) {
-
+void free_system_data(SystemData *system_data) {
+    if (system_data) {
+        free(system_data->connector_types);
+        system_data->connector_types = NULL;
+    }
 }
 
-SystemFreedomResult get_hardware_freedom() {
-    SystemFreedom system_freedom = create_empty_system_freedom();
+SystemDataResult get_system_data() {
+    SystemData system_data = create_empty_system_data();
 
     // Getting os name and architecture from utsname
     struct utsname hardwareinfo;
     if (uname(&hardwareinfo) == 0) {
-        snprintf(system_freedom.os_name, sizeof(system_freedom.os_name), "%s", hardwareinfo.sysname);
-        snprintf(system_freedom.architecture, sizeof(system_freedom.architecture), "%s", hardwareinfo.machine);
+        snprintf(system_data.os_name, sizeof(system_data.os_name), "%s", hardwareinfo.sysname);
+        snprintf(system_data.architecture, sizeof(system_data.architecture), "%s", hardwareinfo.machine);
     } else {
-        return create_error_result("Hardware detection failure: utsname failed");
+        return create_error_result("System detection failure: utsname failed");
     }
 
     // Getting connectors (e.g. DisplayPort, HDMI, VGA) from drm (Direct Rendering Manager)
@@ -89,7 +90,7 @@ SystemFreedomResult get_hardware_freedom() {
 
     dir = opendir(DRM_DIR);
     if (dir == NULL) {
-        create_error_result("Hardware detection failure: utsname failed");
+        return create_error_result("System detection failure: utsname failed");
     }
 
     while ((entry = readdir(dir)) != NULL) {
@@ -107,16 +108,14 @@ SystemFreedomResult get_hardware_freedom() {
                 // Retrieve resources from DRM
                 drmModeRes *resources = drmModeGetResources(fd);
                 if (resources) {
-                    system_freedom.connector_types = (uint32_t *)malloc(resources->count_connectors * sizeof(uint32_t));
-                    if (system_freedom.connector_types) {
+                    system_data.connector_types = (uint32_t *)malloc(resources->count_connectors * sizeof(uint32_t));
+                    if (system_data.connector_types) {
                         // Populate the array
                         for (int i = 0; i < resources->count_connectors; ++i) {
                             drmModeConnector *connector = drmModeGetConnector(fd, resources->connectors[i]);
                             if (connector) {
-                                system_freedom.connector_types[i] = connector->connector_type;
+                                system_data.connector_types[i] = connector->connector_type;
                                 drmModeFreeConnector(connector);
-                            } else {
-                                system_freedom.connector_types[i] = -1; // Handle error
                             }
                         }
                     }
@@ -129,5 +128,5 @@ SystemFreedomResult get_hardware_freedom() {
 
     closedir(dir);
 
-    return create_success_result(system_freedom);
+    return create_success_result(system_data);
 }

@@ -68,5 +68,8 @@ dkms.conf
 # build folder
 build/
 
+# cache
+.cache/
+
 # Swap files
 *.kate-swp
