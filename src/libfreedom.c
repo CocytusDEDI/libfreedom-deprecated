@@ -15,7 +15,7 @@
 typedef struct {
     char os_name[128];         // Operating system name
     char architecture[32];     // CPU architecture
-    char firmware_type[64];    // Type of firmware (e.g., BIOS, UEFI, Coreboot)
+    char firmware[64];    // Type of firmware (e.g., BIOS, UEFI, Coreboot)
     size_t connector_count;
     uint32_t *connector_types;
 } SystemData;
@@ -26,19 +26,26 @@ typedef struct {
     const char *error;
 } SystemDataResult;
 
-// Create an empty SystemData
-SystemData create_empty_system_data() {
+void free_system_data(SystemData *system_data) {
+    if (system_data) {
+        free(system_data->connector_types);
+        system_data->connector_types = NULL;
+    }
+}
+
+/// Create an empty SystemData
+SystemData make_empty_system_data() {
     SystemData empty;
     snprintf(empty.os_name, sizeof(empty.os_name), "%s", "");
     snprintf(empty.architecture, sizeof(empty.architecture), "%s", "");
-    snprintf(empty.firmware_type, sizeof(empty.firmware_type), "%s", "");
+    snprintf(empty.firmware, sizeof(empty.firmware), "%s", "");
     empty.connector_count = 0;
     empty.connector_types = NULL;
     return empty;
 }
 
-// Create a successful result
-SystemDataResult create_success_result(SystemData system_data) {
+/// Create a successful SystemDataResult
+SystemDataResult make_system_data_ok_result(SystemData system_data) {
     SystemDataResult result;
     result.status = 0;  // Standard success code
     result.system_data = system_data;
@@ -46,15 +53,14 @@ SystemDataResult create_success_result(SystemData system_data) {
     return result;
 }
 
-// Create an error result
-SystemDataResult create_error_result(const char *error) {
+/// Create an error SystemDataResult
+SystemDataResult make_system_data_err_result(const char *error) {
     SystemDataResult result;
     result.status = 1;
-    result.system_data = create_empty_system_data();
+    result.system_data = make_empty_system_data();
     result.error = error;
     return result;
 }
-
 
 int is_drm_device(const char *path) {
     struct stat st;
@@ -64,15 +70,8 @@ int is_drm_device(const char *path) {
     return S_ISCHR(st.st_mode); // Return true if it's a character device
 }
 
-void free_system_data(SystemData *system_data) {
-    if (system_data) {
-        free(system_data->connector_types);
-        system_data->connector_types = NULL;
-    }
-}
-
 SystemDataResult get_system_data() {
-    SystemData system_data = create_empty_system_data();
+    SystemData system_data = make_empty_system_data();
 
     // Getting os name and architecture from utsname
     struct utsname hardwareinfo;
@@ -80,7 +79,7 @@ SystemDataResult get_system_data() {
         snprintf(system_data.os_name, sizeof(system_data.os_name), "%s", hardwareinfo.sysname);
         snprintf(system_data.architecture, sizeof(system_data.architecture), "%s", hardwareinfo.machine);
     } else {
-        return create_error_result("System detection failure: utsname failed");
+        return make_system_data_err_result("System detection failure: utsname failed");
     }
 
     // Getting connectors (e.g. DisplayPort, HDMI, VGA) from drm (Direct Rendering Manager)
@@ -90,7 +89,7 @@ SystemDataResult get_system_data() {
 
     dir = opendir(DRM_DIR);
     if (dir == NULL) {
-        return create_error_result("System detection failure: utsname failed");
+        return make_system_data_err_result("System detection failure: utsname failed");
     }
 
     while ((entry = readdir(dir)) != NULL) {
@@ -128,5 +127,83 @@ SystemDataResult get_system_data() {
 
     closedir(dir);
 
-    return create_success_result(system_data);
+    return make_system_data_ok_result(system_data);
+}
+
+typedef struct {
+    int os;
+    int architecture;
+    int firmware;
+    int *connectors;
+} SystemFreedom;
+
+typedef struct {
+    int status;
+    SystemFreedom system_data;
+    const char *error;
+} SystemFreedomResult;
+
+void free_system_freedom(SystemFreedom *system_freedom) {
+    if (system_freedom) {
+        free(system_freedom->connectors);
+    }
+}
+
+/// Create an empty SystemFreedom
+SystemFreedom make_empty_system_freedom() {
+    SystemFreedom empty;
+    empty.os = -1;
+    empty.architecture = -1;
+    empty.firmware = -1;
+    empty.connectors = NULL;
+    return empty;
+}
+
+/// Create a successful SystemFreedomResult
+SystemFreedomResult make_system_freedom_ok_result(SystemFreedom system_freedom) {
+    SystemFreedomResult result;
+    result.status = 0;  // Standard success code
+    result.system_data = system_freedom;
+    result.error = NULL;
+    return result;
+}
+
+/// Create an error SystemFreedomResult
+SystemFreedomResult make_system_freedom_err_result(const char *error) {
+    SystemFreedomResult result;
+    result.status = 1;
+    result.system_data = make_empty_system_freedom();
+    result.error = error;
+    return result;
+}
+
+SystemFreedomResult get_system_freedom(SystemData *system_data) {
+    SystemFreedom system_freedom = make_empty_system_freedom();
+
+    // Check OS
+    if (strcmp(system_data->os_name, "Linux") == 0) {
+        system_freedom.os = 1;
+    } else if (strcmp(system_data->os_name, "BSD") == 0) {
+        system_freedom.os = 1;
+    } else if (strcmp(system_data->os_name, "Windows") == 0) {
+        system_freedom.os = 0;
+    } else if (strcmp(system_data->os_name, "MacOS") == 0) {
+        system_freedom.os = 0;
+    }
+
+    // Check Architecture
+    if (strcmp(system_data->architecture, "RISC-V") == 0) {
+        system_freedom.architecture = 1;
+    } else if (strcmp(system_data->architecture, "x86") == 0) {
+        system_freedom.architecture = 0;
+    } else if (strcmp(system_data->architecture, "arm") == 0) {
+        system_freedom.architecture = 0;
+    }
+
+    // Check Firmware
+    if (strcmp(system_data->firmware, "Coreboot") == 0) {
+        system_freedom.firmware = 1;
+    }
+
+    return make_system_freedom_ok_result(system_freedom);
 }
