@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
     int status;
-    SystemFreedom system_data;
+    SystemFreedom system_freedom;
     const char *error;
 } SystemFreedomResult;
 
