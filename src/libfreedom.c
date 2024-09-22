@@ -139,7 +139,7 @@ typedef struct {
 
 typedef struct {
     int status;
-    SystemFreedom system_data;
+    SystemFreedom system_freedom;
     const char *error;
 } SystemFreedomResult;
 
@@ -163,7 +163,7 @@ SystemFreedom make_empty_system_freedom() {
 SystemFreedomResult make_system_freedom_ok_result(SystemFreedom system_freedom) {
     SystemFreedomResult result;
     result.status = 0;  // Standard success code
-    result.system_data = system_freedom;
+    result.system_freedom = system_freedom;
     result.error = NULL;
     return result;
 }
@@ -172,7 +172,7 @@ SystemFreedomResult make_system_freedom_ok_result(SystemFreedom system_freedom) 
 SystemFreedomResult make_system_freedom_err_result(const char *error) {
     SystemFreedomResult result;
     result.status = 1;
-    result.system_data = make_empty_system_freedom();
+    result.system_freedom = make_empty_system_freedom();
     result.error = error;
     return result;
 }
